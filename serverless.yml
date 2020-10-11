@@ -1,0 +1,293 @@
+service: owner-centric-datastore
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  versionFunctions: false
+  stage: ${env:ENV}
+  region: ${env:AWS_DEFAULT_REGION}
+  environment:
+    AUTH_ISSURE: ${env:AUTH_ISSURE}
+    AUTH_AUDIENCE: ${env:AUTH_AUDIENCE}
+    DYNAMODB: owner-centric-datastore-${env:ENV}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+      Resource:
+        - Fn::GetAtt:
+          - DynamoDB
+          - Arn
+        - Fn::Join:
+          - '/'
+          - - Fn::GetAtt:
+              - DynamoDB
+              - Arn
+            - '*'
+
+functions:
+  demoAuthorizer:
+    handler: src/handlers/authorizer/demo/index.handler
+  dynamodbStream:
+    handler: src/handlers/dynamodb-stream/index.handler
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt:
+              - DynamoDB
+              - StreamArn
+  createUser:
+    handler: src/handlers/api/user/create.handler
+    events:
+      - http:
+          path: user
+          method: POST
+          cors: true
+          authorizer: demoAuthorizer
+  readUser:
+    handler: src/handlers/api/user/read.handler
+    events:
+      - http:
+          path: user
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  createData:
+    handler: src/handlers/api/user/data/create.handler
+    events:
+      - http:
+          path: user/data
+          method: POST
+          cors: true
+          authorizer: demoAuthorizer
+  listData:
+    handler: src/handlers/api/user/data/list.handler
+    events:
+      - http:
+          path: user/data
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  listGroupByUser:
+    handler: src/handlers/api/user/groups/list.handler
+    events:
+      - http:
+          path: user/groups
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  listInvitationByUser:
+    handler: src/handlers/api/user/invitations/list.handler
+    events:
+      - http:
+          path: user/invitations
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  createGroup:
+    handler: src/handlers/api/groups/create.handler
+    events:
+      - http:
+          path: groups
+          method: POST
+          cors: true
+          authorizer: demoAuthorizer
+  readGroup:
+    handler: src/handlers/api/groups/read.handler
+    events:
+      - http:
+          path: groups/{group_id}
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  listGroupData:
+    handler: src/handlers/api/groups/data/list.handler
+    events:
+      - http:
+          path: groups/{group_id}/data
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  createInvitation:
+    handler: src/handlers/api/groups/invitations/create.handler
+    events:
+      - http:
+          path: groups/{group_id}/invitations
+          method: POST
+          cors: true
+          authorizer: demoAuthorizer
+  listInvitationByGroup:
+    handler: src/handlers/api/groups/invitations/list.handler
+    events:
+      - http:
+          path: groups/{group_id}/invitations
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  acceptInvitation:
+    handler: src/handlers/api/groups/invitations/accept.handler
+    events:
+      - http:
+          path: groups/{group_id}/invitations/{invitation_id}/accept
+          method: POST
+          cors: true
+          authorizer: demoAuthorizer
+  declineInvitation:
+    handler: src/handlers/api/groups/invitations/decline.handler
+    events:
+      - http:
+          path: groups/{group_id}/invitations/{invitation_id}/decline
+          method: POST
+          cors: true
+          authorizer: demoAuthorizer
+
+  # dynamodbStream:
+  #   handler: src/handlers/dynamodb-stream/index.handler
+  #   events:
+  #     - stream:
+  #         type: dynamodb
+  #         arn:
+  #           Fn::GetAtt:
+  #             - DynamoDB
+  #             - StreamArn
+  # createUserData:
+  #   handler: src/handlers/api/user/data/create.handler
+  #   events:
+  #     - http:
+  #         path: user/data
+  #         method: POST
+  #         cors: true
+  #         authorizer: demoAuthorizer
+  # listUserData:
+  #   handler: src/handlers/api/user/data/list.handler
+  #   events:
+  #     - http:
+  #         path: user/data
+  #         method: GET
+  #         cors: true
+  #         authorizer: demoAuthorizer
+  # readUserData:
+  #   handler: src/handlers/api/user/data/read.handler
+  #   events:
+  #     - http:
+  #         path: user/data/{data_id}
+  #         method: GET
+  #         cors: true
+  #         authorizer: demoAuthorizer
+  # createGroup:
+  #   handler: src/handlers/api/groups/create.handler
+  #   events:
+  #     - http:
+  #         path: groups
+  #         method: POST
+  #         cors: true
+  #         authorizer: demoAuthorizer
+  # readGroup:
+  #   handler: src/handlers/api/groups/read.handler
+  #   events:
+  #     - http:
+  #         path: groups/{group_id}
+  #         method: GET
+  #         cors: true
+  #         authorizer: demoAuthorizer
+
+package:
+  individually: true
+
+plugins:
+  - serverless-layers
+  - serverless-webpack
+
+custom:
+  serverless-layers:
+    layersDeploymentBucket: owner-centric-datastore-layers-${env:ENV}
+
+resources:
+  Resources:
+    DynamoDB:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: owner-centric-datastore-${env:ENV}
+        AttributeDefinitions:
+          - AttributeName: hash_key
+            AttributeType: S
+          - AttributeName: range_key
+            AttributeType: S
+          - AttributeName: lsi_range_key_0
+            AttributeType: S
+          - AttributeName: lsi_range_key_1
+            AttributeType: S
+          - AttributeName: lsi_range_key_2
+            AttributeType: S
+          - AttributeName: lsi_range_key_3
+            AttributeType: S
+          - AttributeName: lsi_range_key_4
+            AttributeType: S
+          - AttributeName: gsi_hash_key_0
+            AttributeType: S
+          - AttributeName: gsi_range_key_0
+            AttributeType: S
+        KeySchema:
+          - AttributeName: hash_key
+            KeyType: HASH
+          - AttributeName: range_key
+            KeyType: RANGE
+        LocalSecondaryIndexes:
+          - IndexName: lsi_0
+            KeySchema:
+              - AttributeName: hash_key
+                KeyType: HASH
+              - AttributeName: lsi_range_key_0
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: lsi_1
+            KeySchema:
+              - AttributeName: hash_key
+                KeyType: HASH
+              - AttributeName: lsi_range_key_1
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: lsi_2
+            KeySchema:
+              - AttributeName: hash_key
+                KeyType: HASH
+              - AttributeName: lsi_range_key_2
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: lsi_3
+            KeySchema:
+              - AttributeName: hash_key
+                KeyType: HASH
+              - AttributeName: lsi_range_key_3
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: lsi_4
+            KeySchema:
+              - AttributeName: hash_key
+                KeyType: HASH
+              - AttributeName: lsi_range_key_4
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        GlobalSecondaryIndexes:
+          - IndexName: gsi_0
+            KeySchema:
+              - AttributeName: gsi_hash_key_0
+                KeyType: HASH
+              - AttributeName: gsi_range_key_0
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: expired_at
+          Enabled: true
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES

@@ -1,0 +1,13 @@
+version: '3.7'
+
+services:
+  node:
+    image: node:12.16.2
+    working_dir: /code
+    command: npm run develop
+    volumes:
+      - ./:/code
+    ports:
+      - 8000:8000
+    env_file:
+      - ./.env
