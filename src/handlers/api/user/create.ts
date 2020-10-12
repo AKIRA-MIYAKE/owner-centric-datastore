@@ -12,6 +12,28 @@ import {
 
 import { createUser } from '../../../entities/user';
 
+export type RequestBody =  { [key: string]: any } & {  // eslint-disable-line
+  nickname: string;
+};
+
+export function isValidRequestBody(
+  requestBody: { [key: string]: any } // eslint-disable-line
+): asserts requestBody is RequestBody {
+  const errorMessages: string[] = [];
+
+  if (typeof requestBody['nickname'] === 'undefined') {
+    errorMessages.push('"nickname" is required');
+  }
+
+  if (typeof requestBody['nickname'] !== 'string') {
+    errorMessages.push('"nickname" must be string');
+  }
+
+  if (errorMessages.length > 0) {
+    throw new Error(errorMessages.join(' / '));
+  }
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
@@ -28,22 +50,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return generateBadRequestProxyResult({ headers: corsHeaders });
     }
 
-    const errorMessages: string[] = [];
-
-    const nickname = requestBody['nickname'];
-
-    if (typeof nickname === 'undefined') {
-      errorMessages.push('"nickname" is required');
-    }
-
-    if (typeof nickname !== 'string') {
-      errorMessages.push('"nickname" must be string');
-    }
-
-    if (errorMessages.length > 0) {
+    try {
+      isValidRequestBody(requestBody);
+    } catch (error) {
       return generateBadRequestProxyResult({
         headers: corsHeaders,
-        message: errorMessages.join(' / '),
+        message: error.message,
       });
     }
 
@@ -51,7 +63,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const user = await createUser(documentClient, {
       id: tokenPayload.sub,
-      nickname: nickname,
+      nickname: requestBody.nickname,
     });
 
     if (!user) {

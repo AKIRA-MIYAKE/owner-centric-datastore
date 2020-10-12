@@ -1,7 +1,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
 
-import { isDataPayload } from '../../../../interfaces';
+import { DataPayload, isDataPayload } from '../../../../interfaces';
 
 import {
   generateCORSHeaders,
@@ -15,6 +15,34 @@ import {
 import { validateTimezone } from '../../../../lib/date';
 
 import { validateDataPayload, createData } from '../../../../entities/data';
+
+export const isValidDataPayload: (dataPayload: DataPayload) => void = (
+  dataPayload
+) => {
+  const errorMessages = validateDataPayload(dataPayload);
+
+  if (errorMessages.length > 0) {
+    throw new Error(errorMessages.join(' / '));
+  }
+};
+
+export type QueryStrings = { [key: string]: string } & {
+  timezone?: string;
+};
+
+export function isValidQueryStrings(queryStrings: {
+  [key: string]: string;
+}): asserts queryStrings is QueryStrings {
+  const errorMessages: string[] = [];
+
+  if (typeof queryStrings['timezone'] !== 'undefined') {
+    errorMessages.push(...validateTimezone(queryStrings['timezone']));
+  }
+
+  if (errorMessages.length > 0) {
+    throw new Error(errorMessages.join(' / '));
+  }
+}
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
@@ -34,6 +62,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     try {
       isDataPayload(requestBody);
+      isValidDataPayload(requestBody);
     } catch (error) {
       return generateBadRequestProxyResult({
         headers: corsHeaders,
@@ -41,23 +70,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    const errorMessages: string[] = [];
-
-    errorMessages.push(...validateDataPayload(requestBody));
-
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
 
-    const timezone = queryStrings && queryStrings['timezone'];
+    let timezone: string | undefined;
 
-    if (timezone) {
-      errorMessages.push(...validateTimezone(timezone));
-    }
+    if (queryStrings) {
+      try {
+        isValidQueryStrings(queryStrings);
 
-    if (errorMessages.length > 0) {
-      return generateBadRequestProxyResult({
-        headers: corsHeaders,
-        message: errorMessages.join(' / '),
-      });
+        timezone = queryStrings.timezone;
+      } catch (error) {
+        return generateBadRequestProxyResult({
+          headers: corsHeaders,
+          message: error.message,
+        });
+      }
     }
 
     const documentClient = new DynamoDB.DocumentClient();

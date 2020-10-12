@@ -1,7 +1,11 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
 
-import { InvitationEntity, isInvitationStatus } from '../../../../interfaces';
+import {
+  isInvitationStatus,
+  InvitationEntity,
+  InvitationStatus,
+} from '../../../../interfaces';
 
 import {
   generateCORSHeaders,
@@ -18,6 +22,22 @@ import {
   findInvitationByGroupId,
   findInvitationByGroupIdWithStatus,
 } from '../../../../entities/invitation';
+
+export type QueryStrings = { [key: string]: string } & {
+  status?: InvitationStatus;
+};
+
+export function isValidQueryStrings(queryStrings: {
+  [key: string]: string;
+}): asserts queryStrings is QueryStrings {
+  if (typeof queryStrings['status'] !== 'undefined') {
+    if (!isInvitationStatus(queryStrings['status'])) {
+      throw new Error(
+        '"status" is limited to "pending", "accept" and "decline"'
+      );
+    }
+  }
+}
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
@@ -58,7 +78,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
 
-    const status = queryStrings && queryStrings['status'];
+    let status: InvitationStatus | undefined;
+
+    if (queryStrings) {
+      try {
+        isValidQueryStrings(queryStrings);
+
+        status = queryStrings.status;
+      } catch (error) {
+        return generateBadRequestProxyResult({
+          headers: corsHeaders,
+          message: error.message,
+        });
+      }
+    }
 
     let invitations: InvitationEntity[];
     if (!status) {
@@ -66,13 +99,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         groupId,
       });
     } else {
-      if (!isInvitationStatus(status)) {
-        return generateBadRequestProxyResult({
-          headers: corsHeaders,
-          message: '"status" is limited to "pending", "accept" and "decline"',
-        });
-      }
-
       invitations = await findInvitationByGroupIdWithStatus(documentClient, {
         groupId,
         status,

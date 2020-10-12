@@ -20,6 +20,34 @@ import {
 import { isGroupUser, isConsumer, getGroup } from '../../../../entities/group';
 import { findGroupDataByPeriod } from '../../../../entities/data';
 
+export type QueryStrings = { [key: string]: string } & {
+  from?: string;
+  to?: string;
+  timezone?: string;
+};
+
+export function isValidQueryStrings(
+  queryStrings: { [key: string]: string } // esint-disableli
+): asserts queryStrings is QueryStrings {
+  const errorMessages: string[] = [];
+
+  if (typeof queryStrings['from'] !== 'undefined') {
+    errorMessages.push(...validateDate(queryStrings['from']));
+  }
+
+  if (typeof queryStrings['to'] !== 'undefined') {
+    errorMessages.push(...validateDate(queryStrings['to']));
+  }
+
+  if (typeof queryStrings['timezone'] !== 'undefined') {
+    errorMessages.push(...validateTimezone(queryStrings['timezone']));
+  }
+
+  if (errorMessages.length > 0) {
+    throw new Error(errorMessages.join(' / '));
+  }
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
@@ -59,29 +87,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
 
-    const from = queryStrings && queryStrings['from'];
-    const to = queryStrings && queryStrings['to'];
-    const timezone = queryStrings && queryStrings['timezone'];
+    let from: string | undefined;
+    let to: string | undefined;
+    let timezone: string | undefined;
 
-    const errorMessages: string[] = [];
+    if (queryStrings) {
+      try {
+        isValidQueryStrings(queryStrings);
 
-    if (from) {
-      errorMessages.push(...validateDate(from));
-    }
-
-    if (to) {
-      errorMessages.push(...validateDate(to));
-    }
-
-    if (timezone) {
-      errorMessages.push(...validateTimezone(timezone));
-    }
-
-    if (errorMessages.length > 0) {
-      return generateBadRequestProxyResult({
-        headers: corsHeaders,
-        message: errorMessages.join(' / '),
-      });
+        from = queryStrings.from;
+        to = queryStrings.to;
+        timezone = queryStrings.timezone;
+      } catch (error) {
+        return generateBadRequestProxyResult({
+          headers: corsHeaders,
+          message: error.message,
+        });
+      }
     }
 
     const now = dayjs().startOf('day');

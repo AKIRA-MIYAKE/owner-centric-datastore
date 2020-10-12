@@ -1,7 +1,11 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
 
-import { isGroupUserRole, GroupUser } from '../../../../interfaces';
+import {
+  isGroupUserRole,
+  GroupUser,
+  GroupUserRole,
+} from '../../../../interfaces';
 
 import {
   generateCORSHeaders,
@@ -17,6 +21,22 @@ import {
   findGroupUserByUserIdWithRole,
 } from '../../../../entities/group';
 
+export type QueryStrings = { [key: string]: string } & {
+  role?: GroupUserRole;
+};
+
+export function isValidQueryStrings(queryStrings: {
+  [key: string]: string;
+}): asserts queryStrings is QueryStrings {
+  if (typeof queryStrings['role'] !== 'undefined') {
+    if (!isGroupUserRole(queryStrings['role'])) {
+      throw new Error(
+        '"role" is limited to "owner", "provider" and "consumer"'
+      );
+    }
+  }
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
@@ -31,7 +51,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
 
-    const role = queryStrings && queryStrings['role'];
+    let role: GroupUserRole | undefined;
+
+    if (queryStrings) {
+      try {
+        isValidQueryStrings(queryStrings);
+
+        role = queryStrings.role;
+      } catch (error) {
+        return generateBadRequestProxyResult({
+          headers: corsHeaders,
+          message: error.message,
+        });
+      }
+    }
 
     let groupUsers: GroupUser[];
     if (!role) {
@@ -39,13 +72,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         userId: tokenPayload.sub,
       });
     } else {
-      if (!isGroupUserRole(role)) {
-        return generateBadRequestProxyResult({
-          headers: corsHeaders,
-          message: '"role" is limited to "owner", "provider" and "consumer"',
-        });
-      }
-
       groupUsers = await findGroupUserByUserIdWithRole(documentClient, {
         userId: tokenPayload.sub,
         role: role,

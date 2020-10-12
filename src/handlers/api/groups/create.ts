@@ -13,6 +13,28 @@ import {
 import { getUser } from '../../../entities/user';
 import { createGroup } from '../../../entities/group';
 
+export type RequestBody =  { [key: string]: any } & {  // eslint-disable-line
+  name: string;
+};
+
+export function isValidRequestBody(
+  requestBody: { [key: string]: any } // eslint-disable-line
+): asserts requestBody is RequestBody {
+  const errorMessages: string[] = [];
+
+  if (typeof requestBody['name'] === 'undefined') {
+    errorMessages.push('"name" is required');
+  }
+
+  if (typeof requestBody['name'] !== 'string') {
+    errorMessages.push('"name" must be string');
+  }
+
+  if (errorMessages.length > 0) {
+    throw new Error(errorMessages.join(' / '));
+  }
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
@@ -40,26 +62,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return generateBadRequestProxyResult({ headers: corsHeaders });
     }
 
-    const name = requestBody['name'];
-
-    const errorMessages: string[] = [];
-
-    if (typeof name === 'undefined') {
-      errorMessages.push('"name" is required');
-    }
-
-    if (typeof name !== 'string') {
-      errorMessages.push('"name" must be string');
-    }
-
-    if (errorMessages.length > 0) {
+    try {
+      isValidRequestBody(requestBody);
+    } catch (error) {
       return generateBadRequestProxyResult({
         headers: corsHeaders,
-        message: errorMessages.join(' / '),
+        message: error.message,
       });
     }
 
-    const group = await createGroup(documentClient, { user, name });
+    const group = await createGroup(documentClient, {
+      user,
+      name: requestBody.name,
+    });
 
     return {
       statusCode: 200,

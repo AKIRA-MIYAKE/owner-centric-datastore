@@ -24,9 +24,9 @@ export type QueryStrings = { [key: string]: string } & {
   timezone?: string;
 };
 
-export function isQueryStrings(
-  queryStrings: { [key: string]: string } // esint-disableli
-): asserts queryStrings is QueryStrings {
+export function isValidQueryStrings(queryStrings: {
+  [key: string]: string;
+}): asserts queryStrings is QueryStrings {
   const errorMessages: string[] = [];
 
   if (typeof queryStrings['from'] !== 'undefined') {
@@ -70,7 +70,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     if (queryStrings) {
       try {
-        isQueryStrings(queryStrings);
+        isValidQueryStrings(queryStrings);
 
         from = queryStrings.from;
         to = queryStrings.to;
