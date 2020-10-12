@@ -71,6 +71,14 @@ functions:
           method: GET
           cors: true
           authorizer: demoAuthorizer
+  listDataWithDataType:
+    handler: src/handlers/api/user/data/data-type/list.handler
+    events:
+      - http:
+          path: user/data/{data_type}
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
   listGroupByUser:
     handler: src/handlers/api/user/groups/list.handler
     events:
@@ -108,6 +116,14 @@ functions:
     events:
       - http:
           path: groups/{group_id}/data
+          method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  listGroupDataWithDataType:
+    handler: src/handlers/api/groups/data/data-type/list.handler
+    events:
+      - http:
+          path: groups/{group_id}/data/{data_type}
           method: GET
           cors: true
           authorizer: demoAuthorizer

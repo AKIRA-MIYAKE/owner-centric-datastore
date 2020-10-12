@@ -158,6 +158,8 @@ export const createData: (
     hash_key: `user:${userId}/data`,
     range_key: `user:${userId}/data:${id}`,
     lsi_range_key_0: datetimeString,
+    gsi_hash_key_0: `user:${userId}/data/data_type:${payload.type}`,
+    gsi_range_key_0: datetimeString,
   };
 
   await client
@@ -191,17 +193,38 @@ export const findDataByPeriod: (
 
   const records = items as DataRecord[];
 
-  const entities = records.map((record) => toEntity(record));
+  return records.reduce((acc, current) => {
+    const entity = toEntity(current);
 
-  return entities.reduce((acc, current) => {
-    if (typeof acc[current.type] === 'undefined') {
-      acc[current.type] = [current];
+    if (typeof acc[entity.type] === 'undefined') {
+      acc[entity.type] = [entity];
     } else {
-      acc[current.type] = [...acc[current.type], current];
+      acc[entity.type] = [...acc[entity.type], entity];
     }
 
     return acc;
   }, {} as { [type: string]: DataEntity[] });
+};
+
+export const findDataByPeriodWithDataType: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; from: string; to: string; dataType: string }
+) => Promise<DataEntity[]> = async (client, { userId, from, to, dataType }) => {
+  const items = await queryAll(client, {
+    TableName: process.env.DYNAMODB!,  // eslint-disable-line
+    IndexName: 'gsi_0',
+    KeyConditionExpression:
+      'gsi_hash_key_0 = :gsi_hk_0 and gsi_range_key_0 BETWEEN :from and :to',
+    ExpressionAttributeValues: {
+      ':gsi_hk_0': `user:${userId}/data/data_type:${dataType}`,
+      ':from': from,
+      ':to': to,
+    },
+  });
+
+  const records = items as DataRecord[];
+
+  return records.map((record) => toEntity(record));
 };
 
 export const createGroupData: (
@@ -219,6 +242,8 @@ export const createGroupData: (
     hash_key: `group:${groupId}/data`,
     range_key: `group:${groupId}/user:${userId}/data:${dataId}`,
     lsi_range_key_0: dataRecord.lsi_range_key_0,
+    gsi_hash_key_0: `group:${groupId}/data/data_type:${dataRecord.payload.type}`,
+    gsi_range_key_0: dataRecord.lsi_range_key_0,
   };
 
   await client
@@ -273,4 +298,39 @@ export const findGroupDataByPeriod: (
 
     return acc;
   }, {} as { [type: string]: { [userId: string]: DataEntity[] } });
+};
+
+export const findGroupDataByPeriodWithDataType: (
+  client: DynamoDB.DocumentClient,
+  params: { groupId: string; from: string; to: string; dataType: string }
+) => Promise<{ [userId: string]: DataEntity[] }> = async (
+  client,
+  { groupId, from, to, dataType }
+) => {
+  const items = await queryAll(client, {
+    TableName: process.env.DYNAMODB!,  // eslint-disable-line
+    IndexName: 'gsi_0',
+    KeyConditionExpression:
+      'gsi_hash_key_0 = :gsi_hk_0 and gsi_range_key_0 BETWEEN :from and :to',
+    ExpressionAttributeValues: {
+      ':gsi_hk_0': `group:${groupId}/data/data_type:${dataType}`,
+      ':from': from,
+      ':to': to,
+    },
+  });
+
+  const records = items as DataRecord[];
+
+  return records.reduce((acc, current) => {
+    const userId = getUserIdFromGroupDataRecord(current);
+    const entity = toEntity(current);
+
+    if (typeof acc[userId] === 'undefined') {
+      acc[userId] = [entity];
+    } else {
+      acc[userId] = [...acc[userId], entity];
+    }
+
+    return acc;
+  }, {} as { [userId: string]: DataEntity[] });
 };
