@@ -79,11 +79,11 @@ functions:
           method: GET
           cors: true
           authorizer: demoAuthorizer
-  listGroupByUser:
-    handler: src/handlers/api/user/groups/list.handler
+  listGroupUserByUser:
+    handler: src/handlers/api/user/group-users/list.handler
     events:
       - http:
-          path: user/groups
+          path: user/group-users
           method: GET
           cors: true
           authorizer: demoAuthorizer

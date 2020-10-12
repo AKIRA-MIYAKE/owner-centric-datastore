@@ -48,13 +48,22 @@ export const toEntity: (record: InvitationRecord) => InvitationEntity = (
 export const getInvitation: (
   client: DynamoDB.DocumentClient,
   params: { id: string; groupId: string }
-) => Promise<InvitationEntity | undefined> = async (
+) => Promise<InvitationEntity | undefined> = async (client, params) => {
+  const record = await getInvitationRecord(client, params);
+
+  return record && toEntity(record);
+};
+
+export const getInvitationRecord: (
+  client: DynamoDB.DocumentClient,
+  params: { id: string; groupId: string }
+) => Promise<InvitationRecord | undefined> = async (
   client,
   { id, groupId }
 ) => {
   const result = await client
     .get({
-      TableName: process.env.DYNAMODB!,  // eslint-disable-line
+    TableName: process.env.DYNAMODB!,  // eslint-disable-line
       Key: {
         hash_key: `group:${groupId}/invitation`,
         range_key: `group:${groupId}/invitation:${id}`,
@@ -66,9 +75,7 @@ export const getInvitation: (
     return undefined;
   }
 
-  const record = result.Item as InvitationRecord;
-
-  return toEntity(record);
+  return result.Item as InvitationRecord;
 };
 
 export const createInvitation: (
@@ -111,7 +118,16 @@ export const createInvitation: (
 export const findInvitationByGroupId: (
   cleint: DynamoDB.DocumentClient,
   params: { groupId: string }
-) => Promise<InvitationEntity[]> = async (client, { groupId }) => {
+) => Promise<InvitationEntity[]> = async (client, params) => {
+  const records = await queryInvitationRecordByGroupId(client, params);
+
+  return records.map((record) => toEntity(record));
+};
+
+export const queryInvitationRecordByGroupId: (
+  cleint: DynamoDB.DocumentClient,
+  params: { groupId: string }
+) => Promise<InvitationRecord[]> = async (client, { groupId }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     KeyConditionExpression: 'hash_key = :hk',
@@ -120,15 +136,22 @@ export const findInvitationByGroupId: (
     },
   });
 
-  const records = items as InvitationRecord[];
-
-  return records.map((record) => toEntity(record));
+  return items as InvitationRecord[];
 };
 
 export const findInvitationByGroupIdWithStatus: (
   client: DynamoDB.DocumentClient,
   params: { groupId: string; status: InvitationStatus }
-) => Promise<InvitationEntity[]> = async (client, { groupId, status }) => {
+) => Promise<InvitationEntity[]> = async (client, params) => {
+  const records = await queryInvitationRecordByGroupId(client, params);
+
+  return records.map((record) => toEntity(record));
+};
+
+export const queryInvitationRecordByGroupIdWithStatus: (
+  client: DynamoDB.DocumentClient,
+  params: { groupId: string; status: InvitationStatus }
+) => Promise<InvitationRecord[]> = async (client, { groupId, status }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'lsi_0',
@@ -139,15 +162,22 @@ export const findInvitationByGroupIdWithStatus: (
     },
   });
 
-  const records = items as InvitationRecord[];
-
-  return records.map((record) => toEntity(record));
+  return items as InvitationRecord[];
 };
 
 export const findInvitationByUserId: (
   client: DynamoDB.DocumentClient,
   params: { userId: string }
-) => Promise<InvitationEntity[]> = async (client, { userId }) => {
+) => Promise<InvitationEntity[]> = async (client, params) => {
+  const records = await queryInvitationRecordByUserId(client, params);
+
+  return records.map((record) => toEntity(record));
+};
+
+export const queryInvitationRecordByUserId: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string }
+) => Promise<InvitationRecord[]> = async (client, { userId }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -157,15 +187,22 @@ export const findInvitationByUserId: (
     },
   });
 
-  const records = items as InvitationRecord[];
-
-  return records.map((record) => toEntity(record));
+  return items as InvitationRecord[];
 };
 
 export const findInvitationByUserIdWithStatus: (
   client: DynamoDB.DocumentClient,
   params: { userId: string; status: InvitationStatus }
-) => Promise<InvitationEntity[]> = async (client, { userId, status }) => {
+) => Promise<InvitationEntity[]> = async (client, params) => {
+  const records = await queryInvitationRecordByUserIdWithStatus(client, params);
+
+  return records.map((record) => toEntity(record));
+};
+
+export const queryInvitationRecordByUserIdWithStatus: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; status: InvitationStatus }
+) => Promise<InvitationRecord[]> = async (client, { userId, status }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -177,9 +214,7 @@ export const findInvitationByUserIdWithStatus: (
     },
   });
 
-  const records = items as InvitationRecord[];
-
-  return records.map((record) => toEntity(record));
+  return items as InvitationRecord[];
 };
 
 export const acceptInvitation: (

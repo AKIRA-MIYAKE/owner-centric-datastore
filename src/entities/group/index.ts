@@ -107,7 +107,20 @@ export const toGroupUser: (record: GroupUserRecord) => GroupUser = (record) => {
 export const getGroup: (
   client: DynamoDB.DocumentClient,
   params: { id: string }
-) => Promise<GroupEntity | undefined> = async (client, { id }) => {
+) => Promise<GroupEntity | undefined> = async (client, params) => {
+  const records = await getGroupRecords(client, params);
+
+  if (records.length === 0) {
+    return undefined;
+  }
+
+  return toEntityFromRecords(records);
+};
+
+export const getGroupRecords: (
+  client: DynamoDB.DocumentClient,
+  params: { id: string }
+) => Promise<Array<GroupRecord | GroupUserRecord>> = async (client, { id }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     KeyConditionExpression: 'hash_key = :hk',
@@ -116,13 +129,7 @@ export const getGroup: (
     },
   });
 
-  if (items.length === 0) {
-    return undefined;
-  }
-
-  const records = items as Array<GroupRecord | GroupUserRecord>;
-
-  return toEntityFromRecords(records);
+  return items as Array<GroupRecord | GroupUserRecord>;
 };
 
 export const createGroup: (
@@ -180,7 +187,16 @@ export const createGroup: (
 export const findGroupUserByUserId: (
   client: DynamoDB.DocumentClient,
   params: { userId: string }
-) => Promise<GroupUser[]> = async (client, { userId }) => {
+) => Promise<GroupUser[]> = async (client, params) => {
+  const records = await queryGroupUserRecordByUserId(client, params);
+
+  return records.map((record) => toGroupUser(record));
+};
+
+export const queryGroupUserRecordByUserId: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string }
+) => Promise<GroupUserRecord[]> = async (client, { userId }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -190,15 +206,22 @@ export const findGroupUserByUserId: (
     },
   });
 
-  const records = items as GroupUserRecord[];
-
-  return records.map((record) => toGroupUser(record));
+  return items as GroupUserRecord[];
 };
 
 export const findGroupUserByUserIdWithRole: (
   client: DynamoDB.DocumentClient,
   params: { userId: string; role: GroupUserRole }
-) => Promise<GroupUser[]> = async (client, { userId, role }) => {
+) => Promise<GroupUser[]> = async (client, params) => {
+  const records = await queryGroupUserRecordByUserIdWithRole(client, params);
+
+  return records.map((record) => toGroupUser(record));
+};
+
+export const queryGroupUserRecordByUserIdWithRole: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; role: GroupUserRole }
+) => Promise<GroupUserRecord[]> = async (client, { userId, role }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -210,7 +233,5 @@ export const findGroupUserByUserIdWithRole: (
     },
   });
 
-  const records = items as GroupUserRecord[];
-
-  return records.map((record) => toGroupUser(record));
+  return items as GroupUserRecord[];
 };

@@ -21,7 +21,16 @@ export const toEntity: (record: UserRecord) => UserEntity = (record) => {
 export const getUser: (
   client: DynamoDB.DocumentClient,
   params: { id: string }
-) => Promise<UserEntity | undefined> = async (client, { id }) => {
+) => Promise<UserEntity | undefined> = async (client, params) => {
+  const record = await getUserRecord(client, params);
+
+  return record && toEntity(record);
+};
+
+export const getUserRecord: (
+  client: DynamoDB.DocumentClient,
+  params: { id: string }
+) => Promise<UserRecord | undefined> = async (client, { id }) => {
   const result = await client
     .get({
       TableName: process.env.DYNAMODB!,  // eslint-disable-line
@@ -36,9 +45,7 @@ export const getUser: (
     return undefined;
   }
 
-  const record = result.Item as UserRecord;
-
-  return toEntity(record);
+  return result.Item as UserRecord;
 };
 
 export const createUser: (

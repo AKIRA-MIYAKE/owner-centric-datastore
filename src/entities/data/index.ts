@@ -112,7 +112,16 @@ export const toEntity: (record: DataRecord) => DataEntity = (record) => {
 export const getData: (
   client: DynamoDB.DocumentClient,
   params: { id: string; userId: string }
-) => Promise<DataEntity | undefined> = async (client, { id, userId }) => {
+) => Promise<DataEntity | undefined> = async (client, params) => {
+  const record = await getDataRecord(client, params);
+
+  return record && toEntity(record);
+};
+
+export const getDataRecord: (
+  client: DynamoDB.DocumentClient,
+  params: { id: string; userId: string }
+) => Promise<DataRecord | undefined> = async (client, { id, userId }) => {
   const result = await client
     .get({
       TableName: process.env.DYNAMODB!,  // eslint-disable-line
@@ -127,9 +136,7 @@ export const getData: (
     return undefined;
   }
 
-  const record = result.Item as DataRecord;
-
-  return toEntity(record);
+  return result.Item as DataRecord;
 };
 
 export const createData: (
@@ -175,23 +182,8 @@ export const createData: (
 export const findDataByPeriod: (
   client: DynamoDB.DocumentClient,
   params: { userId: string; from: string; to: string }
-) => Promise<{ [type: string]: DataEntity[] }> = async (
-  client,
-  { userId, from, to }
-) => {
-  const items = await queryAll(client, {
-    TableName: process.env.DYNAMODB!,  // eslint-disable-line
-    IndexName: 'lsi_0',
-    KeyConditionExpression:
-      'hash_key = :hk and lsi_range_key_0 BETWEEN :from and :to',
-    ExpressionAttributeValues: {
-      ':hk': `user:${userId}/data`,
-      ':from': from,
-      ':to': to,
-    },
-  });
-
-  const records = items as DataRecord[];
+) => Promise<{ [type: string]: DataEntity[] }> = async (client, params) => {
+  const records = await queryDataRecordByPeriod(client, params);
 
   return records.reduce((acc, current) => {
     const entity = toEntity(current);
@@ -206,10 +198,38 @@ export const findDataByPeriod: (
   }, {} as { [type: string]: DataEntity[] });
 };
 
+export const queryDataRecordByPeriod: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; from: string; to: string }
+) => Promise<DataRecord[]> = async (client, { userId, from, to }) => {
+  const items = await queryAll(client, {
+    TableName: process.env.DYNAMODB!,  // eslint-disable-line
+    IndexName: 'lsi_0',
+    KeyConditionExpression:
+      'hash_key = :hk and lsi_range_key_0 BETWEEN :from and :to',
+    ExpressionAttributeValues: {
+      ':hk': `user:${userId}/data`,
+      ':from': from,
+      ':to': to,
+    },
+  });
+
+  return items as DataRecord[];
+};
+
 export const findDataByPeriodWithDataType: (
   client: DynamoDB.DocumentClient,
   params: { userId: string; from: string; to: string; dataType: string }
-) => Promise<DataEntity[]> = async (client, { userId, from, to, dataType }) => {
+) => Promise<DataEntity[]> = async (client, params) => {
+  const records = await queryDataRecordByPeriod(client, params);
+
+  return records.map((record) => toEntity(record));
+};
+
+export const queryDataRecordByPeriodWithDataType: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; from: string; to: string; dataType: string }
+) => Promise<DataRecord[]> = async (client, { userId, from, to, dataType }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -222,9 +242,7 @@ export const findDataByPeriodWithDataType: (
     },
   });
 
-  const records = items as DataRecord[];
-
-  return records.map((record) => toEntity(record));
+  return items as DataRecord[];
 };
 
 export const createGroupData: (
@@ -261,21 +279,9 @@ export const findGroupDataByPeriod: (
   params: { groupId: string; from: string; to: string }
 ) => Promise<{ [type: string]: { [userId: string]: DataEntity[] } }> = async (
   client,
-  { groupId, from, to }
+  params
 ) => {
-  const items = await queryAll(client, {
-    TableName: process.env.DYNAMODB!,  // eslint-disable-line
-    IndexName: 'lsi_0',
-    KeyConditionExpression:
-      'hash_key = :hk and lsi_range_key_0 BETWEEN :from and :to',
-    ExpressionAttributeValues: {
-      ':hk': `group:${groupId}/data`,
-      ':from': from,
-      ':to': to,
-    },
-  });
-
-  const records = items as GroupDataRecord[];
+  const records = await queryGroupDataRecordByPeriod(client, params);
 
   return records.reduce((acc, current) => {
     const userId = getUserIdFromGroupDataRecord(current);
@@ -300,10 +306,52 @@ export const findGroupDataByPeriod: (
   }, {} as { [type: string]: { [userId: string]: DataEntity[] } });
 };
 
+export const queryGroupDataRecordByPeriod: (
+  client: DynamoDB.DocumentClient,
+  params: { groupId: string; from: string; to: string }
+) => Promise<GroupDataRecord[]> = async (client, { groupId, from, to }) => {
+  const items = await queryAll(client, {
+    TableName: process.env.DYNAMODB!,  // eslint-disable-line
+    IndexName: 'lsi_0',
+    KeyConditionExpression:
+      'hash_key = :hk and lsi_range_key_0 BETWEEN :from and :to',
+    ExpressionAttributeValues: {
+      ':hk': `group:${groupId}/data`,
+      ':from': from,
+      ':to': to,
+    },
+  });
+
+  return items as GroupDataRecord[];
+};
+
 export const findGroupDataByPeriodWithDataType: (
   client: DynamoDB.DocumentClient,
   params: { groupId: string; from: string; to: string; dataType: string }
-) => Promise<{ [userId: string]: DataEntity[] }> = async (
+) => Promise<{ [userId: string]: DataEntity[] }> = async (client, params) => {
+  const records = await queryGorupDataRecordByPeriodWithDataType(
+    client,
+    params
+  );
+
+  return records.reduce((acc, current) => {
+    const userId = getUserIdFromGroupDataRecord(current);
+    const entity = toEntity(current);
+
+    if (typeof acc[userId] === 'undefined') {
+      acc[userId] = [entity];
+    } else {
+      acc[userId] = [...acc[userId], entity];
+    }
+
+    return acc;
+  }, {} as { [userId: string]: DataEntity[] });
+};
+
+export const queryGorupDataRecordByPeriodWithDataType: (
+  client: DynamoDB.DocumentClient,
+  params: { groupId: string; from: string; to: string; dataType: string }
+) => Promise<GroupDataRecord[]> = async (
   client,
   { groupId, from, to, dataType }
 ) => {
@@ -319,18 +367,5 @@ export const findGroupDataByPeriodWithDataType: (
     },
   });
 
-  const records = items as DataRecord[];
-
-  return records.reduce((acc, current) => {
-    const userId = getUserIdFromGroupDataRecord(current);
-    const entity = toEntity(current);
-
-    if (typeof acc[userId] === 'undefined') {
-      acc[userId] = [entity];
-    } else {
-      acc[userId] = [...acc[userId], entity];
-    }
-
-    return acc;
-  }, {} as { [userId: string]: DataEntity[] });
+  return items as GroupDataRecord[];
 };
