@@ -17,11 +17,7 @@ import {
   validateTimezone,
 } from '../../../../../lib/date';
 
-import {
-  isGroupUser,
-  isConsumer,
-  getGroup,
-} from '../../../../../entities/group';
+import { isMember, isConsumer, getGroup } from '../../../../../entities/group';
 import { findGroupDataByPeriodWithDataType } from '../../../../../entities/data';
 
 export type QueryStrings = { [key: string]: string } & {
@@ -84,7 +80,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const userId = tokenPayload.sub;
 
-    if (!isGroupUser(group, userId)) {
+    if (!isMember(group, userId)) {
       return generateNotFoundProxyResult({ headers: corsHeaders });
     }
 

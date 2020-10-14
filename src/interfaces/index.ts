@@ -137,22 +137,23 @@ export function isDatetimeTypeDataPayload(
 
 export interface GroupEntity extends Entity {
   name: string;
-  owners: GroupUser[];
-  providers: GroupUser[];
-  consumers: GroupUser[];
+  owners: MemberEntity[];
+  providers: MemberEntity[];
+  consumers: MemberEntity[];
 }
 
-export interface GroupUser {
+export interface MemberEntity extends Entity {
+  id: string;
   group_id: string;
   group_name: string;
   user_id: string;
   user_nickname: string;
-  role: GroupUserRole;
+  role: MemberRole;
 }
 
-export type GroupUserRole = 'owner' | 'provider' | 'consumer';
+export type MemberRole = 'owner' | 'provider' | 'consumer';
 
-export function isGroupUserRole(role: string): role is GroupUserRole {
+export function isMemberRole(role: string): role is MemberRole {
   return role === 'owner' || role === 'provider' || role === 'consumer';
 }
 
@@ -163,12 +164,15 @@ export interface GroupRecord extends Record {
   created_at: string;
 }
 
-export interface GroupUserRecord extends Record {
+export interface MemberRecord extends Record {
+  id: string;
   group_id: string;
   group_name: string;
   user_id: string;
   user_nickname: string;
-  role: GroupUserRole;
+  role: MemberRole;
+  updated_at: string;
+  created_at: string;
 }
 
 // Invitation
@@ -178,7 +182,7 @@ export interface InvitationEntity extends Entity {
   group_name: string;
   user_id: string;
   user_nickname: string;
-  role: GroupUserRole;
+  role: MemberRole;
   status: InvitationStatus;
 }
 
@@ -194,7 +198,7 @@ export interface InvitationRecord extends Record {
   group_name: string;
   user_id: string;
   user_nickname: string;
-  role: GroupUserRole;
+  role: MemberRole;
   status: InvitationStatus;
   updated_at: string;
   created_at: string;

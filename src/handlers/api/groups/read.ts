@@ -10,7 +10,7 @@ import {
   generateDefaultErrorProxyResult,
 } from '../../../lib/api';
 
-import { isGroupUser, getGroup } from '../../../entities/group';
+import { isMember, getGroup } from '../../../entities/group';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
@@ -38,7 +38,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const userId = tokenPayload.sub;
 
-    if (!isGroupUser(group, userId)) {
+    if (!isMember(group, userId)) {
       return generateNotFoundProxyResult({ headers: corsHeaders });
     }
 

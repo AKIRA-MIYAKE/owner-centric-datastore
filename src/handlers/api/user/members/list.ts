@@ -1,11 +1,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
 
-import {
-  isGroupUserRole,
-  GroupUser,
-  GroupUserRole,
-} from '../../../../interfaces';
+import { isMemberRole, MemberEntity, MemberRole } from '../../../../interfaces';
 
 import {
   generateCORSHeaders,
@@ -17,19 +13,19 @@ import {
 } from '../../../../lib/api';
 
 import {
-  findGroupUserByUserId,
-  findGroupUserByUserIdWithRole,
+  findMemberByUserId,
+  findMemberByUserIdWithRole,
 } from '../../../../entities/group';
 
 export type QueryStrings = { [key: string]: string } & {
-  role?: GroupUserRole;
+  role?: MemberRole;
 };
 
 export function isValidQueryStrings(queryStrings: {
   [key: string]: string;
 }): asserts queryStrings is QueryStrings {
   if (typeof queryStrings['role'] !== 'undefined') {
-    if (!isGroupUserRole(queryStrings['role'])) {
+    if (!isMemberRole(queryStrings['role'])) {
       throw new Error(
         '"role" is limited to "owner", "provider" and "consumer"'
       );
@@ -51,7 +47,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
 
-    let role: GroupUserRole | undefined;
+    let role: MemberRole | undefined;
 
     if (queryStrings) {
       try {
@@ -66,13 +62,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    let groupUsers: GroupUser[];
+    let Members: MemberEntity[];
     if (!role) {
-      groupUsers = await findGroupUserByUserId(documentClient, {
+      Members = await findMemberByUserId(documentClient, {
         userId: tokenPayload.sub,
       });
     } else {
-      groupUsers = await findGroupUserByUserIdWithRole(documentClient, {
+      Members = await findMemberByUserIdWithRole(documentClient, {
         userId: tokenPayload.sub,
         role: role,
       });
@@ -81,7 +77,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify(groupUsers),
+      body: JSON.stringify(Members),
     };
   } catch (error) {
     console.log(error);

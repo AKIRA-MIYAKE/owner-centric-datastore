@@ -6,10 +6,10 @@ import {
   Record,
   UserEntity,
   GroupEntity,
-  GroupUser,
+  MemberEntity,
   GroupRecord,
-  GroupUserRecord,
-  GroupUserRole,
+  MemberRecord,
+  MemberRole,
 } from '../../interfaces';
 
 import { queryAll } from '../../lib/dynamodb';
@@ -20,7 +20,7 @@ export function isGroupRecord(record: Record): record is GroupRecord {
   return record.hash_key === record.range_key && hk[0][0] === 'group';
 }
 
-export function isGroupUserRecord(record: Record): record is GroupUserRecord {
+export function isMemberRecord(record: Record): record is MemberRecord {
   const hk = record.hash_key.split('/').map((s) => s.split(':'));
   const rk = record.range_key.split('/').map((s) => s.split(':'));
 
@@ -30,11 +30,11 @@ export function isGroupUserRecord(record: Record): record is GroupUserRecord {
     rk.length === 3 &&
     rk[0][0] === 'group' &&
     rk[1][0] === 'role' &&
-    rk[2][0] === 'user'
+    rk[2][0] === 'member'
   );
 }
 
-export const isGroupUser: (group: GroupEntity, userId: string) => boolean = (
+export const isMember: (group: GroupEntity, userId: string) => boolean = (
   group,
   userId
 ) => {
@@ -67,7 +67,7 @@ export const isConsumer: (group: GroupEntity, userId: string) => boolean = (
 };
 
 export const toEntityFromRecords: (
-  records: Array<GroupRecord | GroupUserRecord>
+  records: Array<GroupRecord | MemberRecord>
 ) => GroupEntity = (records) => {
   const groupRecord = records.find((record) => isGroupRecord(record)) as
     | GroupRecord
@@ -77,30 +77,35 @@ export const toEntityFromRecords: (
     throw new Error('Something wrong');
   }
 
-  const groupUserRecords = records.filter((record) =>
-    isGroupUserRecord(record)
-  ) as GroupUserRecord[];
+  const MemberRecords = records.filter((record) =>
+    isMemberRecord(record)
+  ) as MemberRecord[];
 
-  const groupUsers = groupUserRecords.map((record) => toGroupUser(record));
+  const Members = MemberRecords.map((record) => toMemberEntity(record));
 
   return {
     id: groupRecord.id,
     name: groupRecord.name,
-    owners: groupUsers.filter((gu) => gu.role === 'owner'),
-    providers: groupUsers.filter((gu) => gu.role === 'provider'),
-    consumers: groupUsers.filter((gu) => gu.role === 'consumer'),
+    owners: Members.filter((gu) => gu.role === 'owner'),
+    providers: Members.filter((gu) => gu.role === 'provider'),
+    consumers: Members.filter((gu) => gu.role === 'consumer'),
     updated_at: groupRecord.updated_at,
     created_at: groupRecord.created_at,
   };
 };
 
-export const toGroupUser: (record: GroupUserRecord) => GroupUser = (record) => {
+export const toMemberEntity: (record: MemberRecord) => MemberEntity = (
+  record
+) => {
   return {
+    id: record.id,
     group_id: record.group_id,
     group_name: record.group_name,
     user_id: record.user_id,
     user_nickname: record.user_nickname,
     role: record.role,
+    updated_at: record.updated_at,
+    created_at: record.created_at,
   };
 };
 
@@ -120,7 +125,7 @@ export const getGroup: (
 export const getGroupRecords: (
   client: DynamoDB.DocumentClient,
   params: { id: string }
-) => Promise<Array<GroupRecord | GroupUserRecord>> = async (client, { id }) => {
+) => Promise<Array<GroupRecord | MemberRecord>> = async (client, { id }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     KeyConditionExpression: 'hash_key = :hk',
@@ -129,7 +134,7 @@ export const getGroupRecords: (
     },
   });
 
-  return items as Array<GroupRecord | GroupUserRecord>;
+  return items as Array<GroupRecord | MemberRecord>;
 };
 
 export const createGroup: (
@@ -137,6 +142,7 @@ export const createGroup: (
   params: { user: UserEntity; name: string }
 ) => Promise<GroupEntity> = async (client, { user, name }) => {
   const id = uuidv4();
+  const MemberId = uuidv4();
   const now = dayjs();
 
   const userId = user.id;
@@ -150,14 +156,17 @@ export const createGroup: (
     range_key: `group:${id}`,
   };
 
-  const ownerGroupUserRecord: GroupUserRecord = {
+  const ownerMemberRecord: MemberRecord = {
+    id: MemberId,
     group_id: id,
     group_name: name,
     user_id: userId,
     user_nickname: user.nickname,
     role: 'owner',
+    updated_at: now.toISOString(),
+    created_at: now.toISOString(),
     hash_key: `group:${id}`,
-    range_key: `group:${id}/role:owner/user:${userId}`,
+    range_key: `group:${id}/role:owner/member:${MemberId}`,
     gsi_hash_key_0: `user:${userId}/group`,
     gsi_range_key_0: `role:owner/group:${id}`,
   };
@@ -174,29 +183,29 @@ export const createGroup: (
         {
           Put: {
             TableName: process.env.DYNAMODB!,  // eslint-disable-line
-            Item: ownerGroupUserRecord,
+            Item: ownerMemberRecord,
           },
         },
       ],
     })
     .promise();
 
-  return toEntityFromRecords([groupRecord, ownerGroupUserRecord]);
+  return toEntityFromRecords([groupRecord, ownerMemberRecord]);
 };
 
-export const findGroupUserByUserId: (
+export const findMemberByUserId: (
   client: DynamoDB.DocumentClient,
   params: { userId: string }
-) => Promise<GroupUser[]> = async (client, params) => {
-  const records = await queryGroupUserRecordByUserId(client, params);
+) => Promise<MemberEntity[]> = async (client, params) => {
+  const records = await queryMemberRecordByUserId(client, params);
 
-  return records.map((record) => toGroupUser(record));
+  return records.map((record) => toMemberEntity(record));
 };
 
-export const queryGroupUserRecordByUserId: (
+export const queryMemberRecordByUserId: (
   client: DynamoDB.DocumentClient,
   params: { userId: string }
-) => Promise<GroupUserRecord[]> = async (client, { userId }) => {
+) => Promise<MemberRecord[]> = async (client, { userId }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -206,22 +215,22 @@ export const queryGroupUserRecordByUserId: (
     },
   });
 
-  return items as GroupUserRecord[];
+  return items as MemberRecord[];
 };
 
-export const findGroupUserByUserIdWithRole: (
+export const findMemberByUserIdWithRole: (
   client: DynamoDB.DocumentClient,
-  params: { userId: string; role: GroupUserRole }
-) => Promise<GroupUser[]> = async (client, params) => {
-  const records = await queryGroupUserRecordByUserIdWithRole(client, params);
+  params: { userId: string; role: MemberRole }
+) => Promise<MemberEntity[]> = async (client, params) => {
+  const records = await queryMemberRecordByUserIdWithRole(client, params);
 
-  return records.map((record) => toGroupUser(record));
+  return records.map((record) => toMemberEntity(record));
 };
 
-export const queryGroupUserRecordByUserIdWithRole: (
+export const queryMemberRecordByUserIdWithRole: (
   client: DynamoDB.DocumentClient,
-  params: { userId: string; role: GroupUserRole }
-) => Promise<GroupUserRecord[]> = async (client, { userId, role }) => {
+  params: { userId: string; role: MemberRole }
+) => Promise<MemberRecord[]> = async (client, { userId, role }) => {
   const items = await queryAll(client, {
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
@@ -233,5 +242,5 @@ export const queryGroupUserRecordByUserIdWithRole: (
     },
   });
 
-  return items as GroupUserRecord[];
+  return items as MemberRecord[];
 };

@@ -8,7 +8,7 @@ import {
   getUserIdFromDataRecord,
   createGroupData,
 } from '../../entities/data';
-import { findGroupUserByUserIdWithRole } from '../../entities/group';
+import { findMemberByUserIdWithRole } from '../../entities/group';
 
 export const handler: DynamoDBStreamHandler = async (event) => {
   return event.Records.reduce(async (acc, current) => {
@@ -35,15 +35,12 @@ export const handler: DynamoDBStreamHandler = async (event) => {
 
         if (isDataRecord(newRecord)) {
           const userId = getUserIdFromDataRecord(newRecord);
-          const groupUsers = await findGroupUserByUserIdWithRole(
-            documentClient,
-            {
-              userId,
-              role: 'provider',
-            }
-          );
+          const Members = await findMemberByUserIdWithRole(documentClient, {
+            userId,
+            role: 'provider',
+          });
 
-          await groupUsers.reduce(async (acc, current) => {
+          await Members.reduce(async (acc, current) => {
             await acc;
 
             await createGroupData(documentClient, {

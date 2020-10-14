@@ -6,8 +6,8 @@ import {
   Record,
   UserEntity,
   GroupEntity,
-  GroupUserRole,
-  GroupUserRecord,
+  MemberRole,
+  MemberRecord,
   InvitationEntity,
   InvitationRecord,
   InvitationStatus,
@@ -80,7 +80,7 @@ export const getInvitationRecord: (
 
 export const createInvitation: (
   client: DynamoDB.DocumentClient,
-  params: { group: GroupEntity; user: UserEntity; role: GroupUserRole }
+  params: { group: GroupEntity; user: UserEntity; role: MemberRole }
 ) => Promise<InvitationEntity> = async (client, { group, user, role }) => {
   const id = uuidv4();
   const now = dayjs();
@@ -221,6 +221,7 @@ export const acceptInvitation: (
   client: DynamoDB.DocumentClient,
   params: { invitation: InvitationEntity }
 ) => Promise<InvitationEntity> = async (client, { invitation }) => {
+  const MemberId = uuidv4();
   const now = dayjs();
 
   const groupId = invitation.group_id;
@@ -228,14 +229,17 @@ export const acceptInvitation: (
   const role = invitation.role;
   const invitationId = invitation.id;
 
-  const groupUserRecord: GroupUserRecord = {
+  const MemberRecord: MemberRecord = {
+    id: MemberId,
     group_id: groupId,
     group_name: invitation.group_name,
     user_id: userId,
     user_nickname: invitation.user_nickname,
     role: role,
+    updated_at: now.toISOString(),
+    created_at: now.toISOString(),
     hash_key: `group:${groupId}`,
-    range_key: `group:${groupId}/role:${role}/user:${userId}`,
+    range_key: `group:${groupId}/role:${role}/member:${MemberId}`,
     gsi_hash_key_0: `user:${userId}/group`,
     gsi_range_key_0: `role:${role}/group/${groupId}`,
   };
@@ -279,7 +283,7 @@ export const acceptInvitation: (
         {
           Put: {
             TableName: process.env.DYNAMODB!,  // eslint-disable-line
-            Item: groupUserRecord,
+            Item: MemberRecord,
           },
         },
       ],

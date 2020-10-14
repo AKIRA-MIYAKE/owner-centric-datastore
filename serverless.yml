@@ -79,11 +79,11 @@ functions:
           method: GET
           cors: true
           authorizer: demoAuthorizer
-  listGroupUserByUser:
-    handler: src/handlers/api/user/group-users/list.handler
+  listMemberByUser:
+    handler: src/handlers/api/user/members/list.handler
     events:
       - http:
-          path: user/group-users
+          path: user/members
           method: GET
           cors: true
           authorizer: demoAuthorizer
@@ -159,56 +159,6 @@ functions:
           method: POST
           cors: true
           authorizer: demoAuthorizer
-
-  # dynamodbStream:
-  #   handler: src/handlers/dynamodb-stream/index.handler
-  #   events:
-  #     - stream:
-  #         type: dynamodb
-  #         arn:
-  #           Fn::GetAtt:
-  #             - DynamoDB
-  #             - StreamArn
-  # createUserData:
-  #   handler: src/handlers/api/user/data/create.handler
-  #   events:
-  #     - http:
-  #         path: user/data
-  #         method: POST
-  #         cors: true
-  #         authorizer: demoAuthorizer
-  # listUserData:
-  #   handler: src/handlers/api/user/data/list.handler
-  #   events:
-  #     - http:
-  #         path: user/data
-  #         method: GET
-  #         cors: true
-  #         authorizer: demoAuthorizer
-  # readUserData:
-  #   handler: src/handlers/api/user/data/read.handler
-  #   events:
-  #     - http:
-  #         path: user/data/{data_id}
-  #         method: GET
-  #         cors: true
-  #         authorizer: demoAuthorizer
-  # createGroup:
-  #   handler: src/handlers/api/groups/create.handler
-  #   events:
-  #     - http:
-  #         path: groups
-  #         method: POST
-  #         cors: true
-  #         authorizer: demoAuthorizer
-  # readGroup:
-  #   handler: src/handlers/api/groups/read.handler
-  #   events:
-  #     - http:
-  #         path: groups/{group_id}
-  #         method: GET
-  #         cors: true
-  #         authorizer: demoAuthorizer
 
 package:
   individually: true

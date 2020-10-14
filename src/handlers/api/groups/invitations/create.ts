@@ -11,11 +11,11 @@ import {
   generateDefaultErrorProxyResult,
 } from '../../../../lib/api';
 
-import { isGroupUserRole, GroupUserRole } from '../../../../interfaces';
+import { isMemberRole, MemberRole } from '../../../../interfaces';
 
 import { getUser } from '../../../../entities/user';
 import {
-  isGroupUser,
+  isMember,
   isOwner,
   isProvider,
   isConsumer,
@@ -28,7 +28,7 @@ import {
 
 export type RequestBody =  { [key: string]: any } & {  // eslint-disable-line
   user_id: string;
-  role: GroupUserRole;
+  role: MemberRole;
 };
 
 export function isValidRequestBody(
@@ -52,7 +52,7 @@ export function isValidRequestBody(
     errorMessages.push('"role" must be string');
   }
 
-  if (!isGroupUserRole(requestBody['role'])) {
+  if (!isMemberRole(requestBody['role'])) {
     errorMessages.push(
       '"role" is limited to "owner", "provider" and "consumer"'
     );
@@ -89,7 +89,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const operatorId = tokenPayload.sub;
 
-    if (!isGroupUser(group, operatorId)) {
+    if (!isMember(group, operatorId)) {
       return generateNotFoundProxyResult({ headers: corsHeaders });
     }
 
