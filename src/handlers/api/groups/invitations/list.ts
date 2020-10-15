@@ -9,18 +9,17 @@ import {
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
   getQueryStringParameters,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
-  generateNotFoundProxyResult,
   generateDefaultErrorProxyResult,
 } from '../../../../lib/api';
 
-import { isMember, isOwner, getGroup } from '../../../../entities/group';
 import {
-  findInvitationByGroupId,
-  findInvitationByGroupIdWithStatus,
+  findInvitationsByGroupId,
+  findInvitationsByGroupIdWithStatus,
 } from '../../../../entities/invitation';
 
 export type QueryStrings = { [key: string]: string } & {
@@ -43,9 +42,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
@@ -53,27 +52,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     if (!groupId) {
       return generateBadRequestProxyResult({ headers: corsHeaders });
-    }
-
-    const documentClient = new DynamoDB.DocumentClient();
-
-    const group = await getGroup(documentClient, { id: groupId });
-
-    if (!group) {
-      return generateNotFoundProxyResult({ headers: corsHeaders });
-    }
-
-    const userId = tokenPayload.sub;
-
-    if (!isMember(group, userId)) {
-      return generateNotFoundProxyResult({ headers: corsHeaders });
-    }
-
-    if (!isOwner(group, userId)) {
-      return generateUnauthorizedProxyResult({
-        headers: corsHeaders,
-        message: 'This operation is not allowed',
-      });
     }
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
@@ -93,23 +71,34 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    let invitations: InvitationEntity[];
-    if (!status) {
-      invitations = await findInvitationByGroupId(documentClient, {
-        groupId,
-      });
-    } else {
-      invitations = await findInvitationByGroupIdWithStatus(documentClient, {
-        groupId,
-        status,
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
+
+      let invitations: InvitationEntity[] | undefined;
+      if (!status) {
+        invitations = await findInvitationsByGroupId(documentClient, {
+          userId,
+          groupId,
+        });
+      } else {
+        invitations = await findInvitationsByGroupIdWithStatus(documentClient, {
+          userId,
+          groupId,
+          status,
+        });
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(invitations),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
       });
     }
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(invitations),
-    };
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });

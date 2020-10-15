@@ -27,3 +27,39 @@ export const queryAll: (
     return updatedItems;
   }
 };
+
+export const batchWriteAll: (
+  client: DynamoDB.DocumentClient,
+  params: DynamoDB.DocumentClient.BatchWriteItemInput
+) => Promise<void> = async (client, params) => {
+  const items = params.RequestItems;
+  const requestNumber = Object.keys(items).reduce((acc, current) => {
+    acc = acc + items[current].length;
+    return acc;
+  }, 0);
+
+  if (requestNumber <= 25) {
+    await client.batchWrite(params).promise();
+    return;
+  }
+
+  const chunk = Object.keys(items).reduce((acc, current) => {
+    const requests = items[current];
+    for (let i = 0; i < requests.length; i += 25) {
+      acc.push({
+        [current]: requests.slice(i, i + 25),
+      });
+    }
+
+    return acc;
+  }, [] as DynamoDB.DocumentClient.BatchWriteItemRequestMap[]);
+
+  await chunk.reduce(async (acc, current) => {
+    await acc;
+    await client
+      .batchWrite({
+        RequestItems: current,
+      })
+      .promise();
+  }, Promise.resolve());
+};

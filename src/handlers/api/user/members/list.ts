@@ -5,17 +5,18 @@ import { isMemberRole, MemberEntity, MemberRole } from '../../../../interfaces';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
   getQueryStringParameters,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
   generateDefaultErrorProxyResult,
 } from '../../../../lib/api';
 
 import {
-  findMemberByUserId,
-  findMemberByUserIdWithRole,
-} from '../../../../entities/group';
+  findMembersByUserId,
+  findMembersByUserIdWithRole,
+} from '../../../../entities/member';
 
 export type QueryStrings = { [key: string]: string } & {
   role?: MemberRole;
@@ -37,13 +38,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
-
-    const documentClient = new DynamoDB.DocumentClient();
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
 
@@ -62,23 +61,32 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    let Members: MemberEntity[];
-    if (!role) {
-      Members = await findMemberByUserId(documentClient, {
-        userId: tokenPayload.sub,
-      });
-    } else {
-      Members = await findMemberByUserIdWithRole(documentClient, {
-        userId: tokenPayload.sub,
-        role: role,
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
+
+      let members: MemberEntity[];
+      if (!role) {
+        members = await findMembersByUserId(documentClient, {
+          userId,
+        });
+      } else {
+        members = await findMembersByUserIdWithRole(documentClient, {
+          userId,
+          role,
+        });
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(members),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
       });
     }
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(Members),
-    };
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });

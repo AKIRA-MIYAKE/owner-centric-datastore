@@ -60,12 +60,14 @@ export interface UserRecord extends Record {
 export type DataEntity = DateTypeDataEntity | DatetimeTypeDataEntity;
 
 export interface DateTypeDataEntity extends Entity {
+  user_id: string;
   type: string;
   value: any;  // eslint-disable-line
   date: string;
 }
 
 export interface DatetimeTypeDataEntity extends Entity {
+  user_id: string;
   type: string;
   value: any;  // eslint-disable-line
   datetime: string;
@@ -73,6 +75,7 @@ export interface DatetimeTypeDataEntity extends Entity {
 
 export interface DataRecord extends Record {
   id: string;
+  user_id: string;
   payload: DataPayload;
   updated_at: string;
   created_at: string;

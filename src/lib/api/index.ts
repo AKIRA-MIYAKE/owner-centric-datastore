@@ -4,6 +4,7 @@ import {
 } from 'aws-lambda';
 
 import { AccessTokenPayload } from '../../interfaces';
+import { ApplicationError, PermissionError, NonExistentError } from '../error';
 
 export const generateCORSHeaders: () => {
   [key: string]: string | boolean;
@@ -12,6 +13,14 @@ export const generateCORSHeaders: () => {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Credentials': true,
   };
+};
+
+export const getUserId: (
+  authorizerContext: APIGatewayEventDefaultAuthorizerContext
+) => string | undefined = (authorizerContext) => {
+  const tokenPayload = getAccessTokenPayload(authorizerContext);
+
+  return tokenPayload && tokenPayload.sub;
 };
 
 export const getAccessToken: (
@@ -82,6 +91,34 @@ export const getQueryStringParameters: <T = { [key: string]: string }>(
   return params as any;  // eslint-disable-line
 };
 
+export const handleApplicationError: (params: {
+  headers?: { [key: string]: string | boolean };
+  error: any;  // eslint-disable-line
+}) => APIGatewayProxyResult = ({ headers, error }) => {
+  console.log(error);
+  if (error instanceof ApplicationError) {
+    return generateBadRequestProxyResult({
+      headers,
+      message: error.message,
+    });
+  } else if (error instanceof PermissionError) {
+    return generateUnauthorizedProxyResult({
+      headers,
+      message: error.message,
+    });
+  } else if (error instanceof NonExistentError) {
+    return generateNotFoundProxyResult({
+      headers,
+      message: error.message,
+    });
+  } else {
+    return generateDefaultErrorProxyResult({
+      headers,
+      error,
+    });
+  }
+};
+
 export const generateBadRequestProxyResult: (params: {
   headers?: { [key: string]: string | boolean };
   message?: string;
@@ -122,9 +159,6 @@ export const generateDefaultErrorProxyResult: (params: {
   return {
     statusCode: error['statusCode'] || 500,
     headers,
-    body: JSON.stringify({
-      ...error,
-      message: error.message,
-    }),
+    body: JSON.stringify(error),
   };
 };

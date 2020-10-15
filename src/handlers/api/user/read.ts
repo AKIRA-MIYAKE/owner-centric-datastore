@@ -3,7 +3,8 @@ import { DynamoDB } from 'aws-sdk';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateNotFoundProxyResult,
   generateDefaultErrorProxyResult,
@@ -15,28 +16,32 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
-    const documentClient = new DynamoDB.DocumentClient();
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
 
-    const user = await getUser(documentClient, { id: tokenPayload.sub });
+      const user = await getUser(documentClient, { userId });
 
-    if (!user) {
-      return generateNotFoundProxyResult({
+      if (!user) {
+        return generateNotFoundProxyResult({
+          headers: corsHeaders,
+          message: 'User is not registered',
+        });
+      }
+
+      return {
+        statusCode: 200,
         headers: corsHeaders,
-        message: 'User is not registered',
-      });
+        body: JSON.stringify(user),
+      };
+    } catch (error) {
+      return handleApplicationError(error);
     }
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(user),
-    };
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });

@@ -5,9 +5,10 @@ import { DataPayload, isDataPayload } from '../../../../interfaces';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
   parseJSONBody,
   getQueryStringParameters,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
   generateDefaultErrorProxyResult,
@@ -48,9 +49,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
@@ -87,19 +88,26 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    const documentClient = new DynamoDB.DocumentClient();
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
 
-    const data = await createData(documentClient, {
-      userId: tokenPayload.sub,
-      payload: requestBody,
-      timezone,
-    });
+      const data = await createData(documentClient, {
+        userId,
+        payload: requestBody,
+        timezone,
+      });
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(data),
-    };
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(data),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
+      });
+    }
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });

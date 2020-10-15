@@ -3,12 +3,9 @@ import { DynamoDB } from 'aws-sdk';
 
 import { Record } from '../../interfaces';
 
-import {
-  isDataRecord,
-  getUserIdFromDataRecord,
-  createGroupData,
-} from '../../entities/data';
-import { findMemberByUserIdWithRole } from '../../entities/group';
+import { isDataRecord } from '../../dynamodb/data';
+import { queryMemberRecordsByUserIdWithRole } from '../../dynamodb/member';
+import { putGroupDataRecord } from '../../dynamodb/group-data';
 
 export const handler: DynamoDBStreamHandler = async (event) => {
   return event.Records.reduce(async (acc, current) => {
@@ -34,24 +31,23 @@ export const handler: DynamoDBStreamHandler = async (event) => {
         }
 
         if (isDataRecord(newRecord)) {
-          const userId = getUserIdFromDataRecord(newRecord);
-          const Members = await findMemberByUserIdWithRole(documentClient, {
-            userId,
-            role: 'provider',
-          });
+          const memberRecords = await queryMemberRecordsByUserIdWithRole(
+            documentClient,
+            {
+              userId: newRecord.user_id,
+              role: 'provider',
+            }
+          );
 
-          await Members.reduce(async (acc, current) => {
+          await memberRecords.reduce(async (acc, current) => {
             await acc;
 
-            await createGroupData(documentClient, {
+            await putGroupDataRecord(documentClient, {
               dataRecord: newRecord,
               groupId: current.group_id,
             });
-
-            return Promise.resolve();
           }, Promise.resolve());
         }
-
         break;
       case 'MODIFY':
         break;

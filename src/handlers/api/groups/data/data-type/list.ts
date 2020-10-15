@@ -1,24 +1,18 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import dayjs from 'dayjs';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
   getQueryStringParameters,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
-  generateNotFoundProxyResult,
   generateDefaultErrorProxyResult,
 } from '../../../../../lib/api';
-import {
-  toDateISOString,
-  validateDate,
-  validateTimezone,
-} from '../../../../../lib/date';
+import { validateDate, validateTimezone } from '../../../../../lib/date';
 
-import { isMember, isConsumer, getGroup } from '../../../../../entities/group';
-import { findGroupDataByPeriodWithDataType } from '../../../../../entities/data';
+import { findGroupDataByPeriodWithDataType } from '../../../../../entities/group-data';
 
 export type QueryStrings = { [key: string]: string } & {
   from?: string;
@@ -52,9 +46,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
@@ -68,27 +62,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     if (!dataType) {
       return generateBadRequestProxyResult({ headers: corsHeaders });
-    }
-
-    const documentClient = new DynamoDB.DocumentClient();
-
-    const group = await getGroup(documentClient, { id: groupId });
-
-    if (!group) {
-      return generateNotFoundProxyResult({ headers: corsHeaders });
-    }
-
-    const userId = tokenPayload.sub;
-
-    if (!isMember(group, userId)) {
-      return generateNotFoundProxyResult({ headers: corsHeaders });
-    }
-
-    if (!isConsumer(group, userId)) {
-      return generateUnauthorizedProxyResult({
-        headers: corsHeaders,
-        message: 'This operation is not allowed',
-      });
     }
 
     const queryStrings = getQueryStringParameters(event.queryStringParameters);
@@ -112,31 +85,34 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    const now = dayjs().startOf('day');
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
 
-    const data = await findGroupDataByPeriodWithDataType(documentClient, {
-      groupId,
-      from: from
-        ? toDateISOString(from, { timezone })
-        : toDateISOString(now.subtract(7, 'day').format('YYYY-MM-DD'), {
-            timezone,
-          }),
-      to: to
-        ? toDateISOString(to, { timezone, isEndOf: true })
-        : toDateISOString(now.format('YYYY-MM-DD'), {
-            timezone,
-            isEndOf: true,
-          }),
-      dataType,
-    });
+      const data = await findGroupDataByPeriodWithDataType(documentClient, {
+        userId,
+        groupId,
+        dataType,
+        from,
+        to,
+        timezone,
+      });
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(data),
-    };
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(data),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
+      });
+    }
   } catch (error) {
     console.log(error);
-    return generateDefaultErrorProxyResult({ headers: corsHeaders, error });
+    return generateDefaultErrorProxyResult({
+      headers: corsHeaders,
+      error,
+    });
   }
 };

@@ -3,25 +3,22 @@ import { DynamoDB } from 'aws-sdk';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
-  generateNotFoundProxyResult,
   generateDefaultErrorProxyResult,
 } from '../../../../lib/api';
 
-import {
-  getInvitation,
-  acceptInvitation,
-} from '../../../../entities/invitation';
+import { acceptInvitation } from '../../../../entities/invitation';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
@@ -38,32 +35,26 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return generateBadRequestProxyResult({ headers: corsHeaders });
     }
 
-    const documentClient = new DynamoDB.DocumentClient();
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
 
-    const invitation = await getInvitation(documentClient, {
-      id: invitationId,
-      groupId,
-    });
+      const invitation = await acceptInvitation(documentClient, {
+        userId,
+        groupId,
+        invitationId,
+      });
 
-    if (!invitation) {
-      return generateNotFoundProxyResult({ headers: corsHeaders });
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(invitation),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
+      });
     }
-
-    const userId = tokenPayload.sub;
-
-    if (invitation.user_id !== userId) {
-      return generateNotFoundProxyResult({ headers: corsHeaders });
-    }
-
-    const updatedInvitation = await acceptInvitation(documentClient, {
-      invitation,
-    });
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(updatedInvitation),
-    };
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });

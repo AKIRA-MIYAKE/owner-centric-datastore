@@ -3,8 +3,9 @@ import { DynamoDB } from 'aws-sdk';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
   parseJSONBody,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
   generateDefaultErrorProxyResult,
@@ -38,9 +39,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
@@ -59,25 +60,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    const documentClient = new DynamoDB.DocumentClient();
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
 
-    const user = await createUser(documentClient, {
-      id: tokenPayload.sub,
-      nickname: requestBody.nickname,
-    });
+      const user = await createUser(documentClient, {
+        userId,
+        nickname: requestBody.nickname,
+      });
 
-    if (!user) {
-      return generateBadRequestProxyResult({
+      return {
+        statusCode: 200,
         headers: corsHeaders,
-        message: 'User already exists',
+        body: JSON.stringify(user),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
       });
     }
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(user),
-    };
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });

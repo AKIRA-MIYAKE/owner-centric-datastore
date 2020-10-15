@@ -1,20 +1,16 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import dayjs from 'dayjs';
 
 import {
   generateCORSHeaders,
-  getAccessTokenPayload,
+  getUserId,
   getQueryStringParameters,
+  handleApplicationError,
   generateUnauthorizedProxyResult,
   generateBadRequestProxyResult,
   generateDefaultErrorProxyResult,
 } from '../../../../lib/api';
-import {
-  toDateISOString,
-  validateDate,
-  validateTimezone,
-} from '../../../../lib/date';
+import { validateDate, validateTimezone } from '../../../../lib/date';
 
 import { findDataByPeriod } from '../../../../entities/data';
 
@@ -50,9 +46,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const corsHeaders = generateCORSHeaders();
 
   try {
-    const tokenPayload = getAccessTokenPayload(event.requestContext.authorizer);
+    const userId = getUserId(event.requestContext.authorizer);
 
-    if (!tokenPayload) {
+    if (!userId) {
       return generateUnauthorizedProxyResult({ headers: corsHeaders });
     }
 
@@ -77,30 +73,27 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    const now = dayjs().startOf('day');
+    try {
+      const documentClient = new DynamoDB.DocumentClient();
 
-    const documentClient = new DynamoDB.DocumentClient();
+      const data = await findDataByPeriod(documentClient, {
+        userId,
+        from,
+        to,
+        timezone,
+      });
 
-    const data = await findDataByPeriod(documentClient, {
-      userId: tokenPayload.sub,
-      from: from
-        ? toDateISOString(from, { timezone })
-        : toDateISOString(now.subtract(7, 'day').format('YYYY-MM-DD'), {
-            timezone,
-          }),
-      to: to
-        ? toDateISOString(to, { timezone, isEndOf: true })
-        : toDateISOString(now.format('YYYY-MM-DD'), {
-            timezone,
-            isEndOf: true,
-          }),
-    });
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(data),
-    };
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(data),
+      };
+    } catch (error) {
+      return handleApplicationError({
+        headers: corsHeaders,
+        error,
+      });
+    }
   } catch (error) {
     console.log(error);
     return generateDefaultErrorProxyResult({ headers: corsHeaders, error });
