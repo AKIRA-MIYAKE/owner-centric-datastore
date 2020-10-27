@@ -58,14 +58,6 @@ export const toEntity: (record: DataRecord) => DataEntity = (record) => {
   }
 };
 
-export const getUserIdFromDataRecord: (record: DataRecord) => string = (
-  record
-) => {
-  const hk = record.hash_key.split('/').map((s) => s.split(':'));
-
-  return hk[0][1];
-};
-
 export const getDataRecord: (
   client: DynamoDB.DocumentClient,
   params: { userId: string; dataId: string }
@@ -160,4 +152,66 @@ export const putDataRecord: (
     .promise();
 
   return record;
+};
+
+export const updateDataRecord: (
+  client: DynamoDB.DocumentClient,
+  params: {
+    userId: string;
+    dataId: string;
+    payload: DataPayload;
+    timezone?: string;
+  }
+) => Promise<{ updated_at: string }> = async (
+  client,
+  { userId, dataId, payload, timezone }
+) => {
+  const now = dayjs();
+
+  let datetimeString: string;
+  if (isDateTypeDataPayload(payload)) {
+    datetimeString = toDateISOString(payload.date, {
+      timezone,
+    });
+  } else if (isDatetimeTypeDataPayload(payload)) {
+    datetimeString = dayjs(payload.datetime).toISOString();
+  } else {
+    throw new Error('Something wrong');
+  }
+
+  await client
+    .update({
+      TableName: process.env.DYNAMODB!,  // eslint-disable-line
+      Key: {
+        hash_key: `user:${userId}/data`,
+        range_key: `user:${userId}/data:${dataId}`,
+      },
+      UpdateExpression:
+        'SET payload = :payload, updated_at = :updated_at, lsi_range_key_0 = :lsi_rk_0, gsi_hash_key_0 = :gsi_hk_0, gsi_range_key_0 = :gsi_rk_0',
+      ExpressionAttributeValues: {
+        ':payload': payload,
+        ':updated_at': now.toISOString(),
+        ':lsi_rk_0': datetimeString,
+        ':gsi_hk_0': `user:${userId}/data/data_type:${payload.type}`,
+        ':gsi_rk_0': datetimeString,
+      },
+    })
+    .promise();
+
+  return { updated_at: now.toISOString() };
+};
+
+export const deleteDataRecord: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; dataId: string }
+) => Promise<void> = async (client, { userId, dataId }) => {
+  await client
+    .delete({
+      TableName: process.env.DYNAMODB!,  // eslint-disable-line
+      Key: {
+        hash_key: `user:${userId}/data`,
+        range_key: `user:${userId}/data:${dataId}`,
+      },
+    })
+    .promise();
 };

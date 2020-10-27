@@ -25,7 +25,7 @@ import {
 } from '../../dynamodb/invitation';
 
 import { getUser } from '../user';
-import { isOwner, getGroup, isProvider, isConsumer } from '../group';
+import { isOwner, isProvider, isConsumer, getGroup } from '../group';
 
 export const findInvitationsByGroupId: (
   client: DynamoDB.DocumentClient,

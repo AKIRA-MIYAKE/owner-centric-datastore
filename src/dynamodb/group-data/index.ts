@@ -119,29 +119,38 @@ export const queryGroupDataRecordsByPeriodWithDataType: (
   return items as GroupDataRecord[];
 };
 
-export const putGroupDataRecord: (
+export const queryGroupDataRecordsByUserId: (
   client: DynamoDB.DocumentClient,
-  params: { dataRecord: DataRecord; groupId: string }
-) => Promise<GroupDataRecord> = async (client, { dataRecord, groupId }) => {
-  const record = convertToGroupDataRecord({ dataRecord, groupId });
+  params: { groupId: string; userId: string }
+) => Promise<GroupDataRecord[]> = async (client, { groupId, userId }) => {
+  const items = await queryAll(client, {
+    TableName: process.env.DYNAMODB!,  // eslint-disable-line
+    KeyConditionExpression: 'hash_key = :hk and begins_with(range_key, :rk)',
+    ExpressionAttributeValues: {
+      ':hk': `group:${groupId}/data`,
+      ':rk': `group:${groupId}/user:${userId}/data`,
+    },
+  });
 
-  await client
-    .put({
-      TableName: process.env.DYNAMODB!,  // eslint-disable-line
-      Item: record,
-    })
-    .promise();
-
-  return record;
+  return items as GroupDataRecord[];
 };
 
-export const batchPutGroupRecord: (
+export const batchPutGroupRecordsByDataRecordsAndGroupIds: (
   client: DynamoDB.DocumentClient,
-  params: { dataRecords: DataRecord[]; groupId: string }
-) => Promise<void> = async (client, { dataRecords, groupId }) => {
-  const records = dataRecords.map((dataRecord) =>
-    convertToGroupDataRecord({ dataRecord, groupId })
-  );
+  params: { dataRecords: DataRecord[]; groupIds: string[] }
+) => Promise<void> = async (client, { dataRecords, groupIds }) => {
+  const records = dataRecords.reduce((acc, current) => {
+    groupIds.forEach((groupId) => {
+      acc.push(
+        convertToGroupDataRecord({
+          dataRecord: current,
+          groupId,
+        })
+      );
+    });
+
+    return acc;
+  }, [] as GroupDataRecord[]);
 
   await batchWriteAll(client, {
     RequestItems: {
@@ -149,6 +158,59 @@ export const batchPutGroupRecord: (
         return {
           PutRequest: {
             Item: record,
+          },
+        };
+      }),
+    },
+  });
+};
+
+export const batchDeleteGroupRecordsByDataRecordsAndGroupIds: (
+  client: DynamoDB.DocumentClient,
+  params: { dataRecords: DataRecord[]; groupIds: string[] }
+) => Promise<void> = async (client, { dataRecords, groupIds }) => {
+  const records = dataRecords.reduce((acc, current) => {
+    groupIds.forEach((groupId) => {
+      acc.push(
+        convertToGroupDataRecord({
+          dataRecord: current,
+          groupId,
+        })
+      );
+    });
+
+    return acc;
+  }, [] as GroupDataRecord[]);
+
+  await batchWriteAll(client, {
+    RequestItems: {
+      [process.env.DYNAMODB!]: records.map((record) => {  // eslint-disable-line
+        return {
+          DeleteRequest: {
+            Key: {
+              hash_key: record.hash_key,
+              range_key: record.range_key,
+            },
+          },
+        };
+      }),
+    },
+  });
+};
+
+export const batchDeleteGroupRecordsByGroupDataRecords: (
+  client: DynamoDB.DocumentClient,
+  params: { groupDataRecords: GroupDataRecord[] }
+) => Promise<void> = async (client, { groupDataRecords }) => {
+  await batchWriteAll(client, {
+    RequestItems: {
+      [process.env.DYNAMODB!]: groupDataRecords.map((record) => {  // eslint-disable-line
+        return {
+          DeleteRequest: {
+            Key: {
+              hash_key: record.hash_key,
+              range_key: record.range_key,
+            },
           },
         };
       }),

@@ -45,6 +45,9 @@ module.exports = {
       eslint: {
         files: './src/**/*.{ts,tsx,js,jsx}',
       },
+      typescript: {
+        enabled: false,
+      },
     })
   ],
 };

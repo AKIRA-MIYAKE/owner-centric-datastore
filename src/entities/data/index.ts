@@ -13,6 +13,7 @@ import {
   validateDatetime,
   toDateISOString,
 } from '../../lib/date';
+import { NonExistentError } from '../../lib/error';
 
 import {
   toEntity,
@@ -20,6 +21,8 @@ import {
   queryDataRecordsByPeriod,
   queryDataRecordsByPeriodWithDataType,
   putDataRecord,
+  updateDataRecord,
+  deleteDataRecord,
 } from '../../dynamodb/data';
 
 export const validateDataPayload: (payload: DataPayload) => string[] = (
@@ -123,4 +126,47 @@ export const createData: (
   const record = await putDataRecord(client, { userId, payload, timezone });
 
   return toEntity(record);
+};
+
+export const patchData: (
+  client: DynamoDB.DocumentClient,
+  params: {
+    userId: string;
+    dataId: string;
+    payload: DataPayload;
+    timezone?: string;
+  }
+) => Promise<DataEntity> = async (
+  client,
+  { userId, dataId, payload, timezone }
+) => {
+  const record = await getDataRecord(client, { userId, dataId });
+
+  if (!record) {
+    throw new NonExistentError();
+  }
+
+  const { updated_at } = await updateDataRecord(client, {
+    userId,
+    dataId,
+    payload,
+    timezone,
+  });
+
+  const newRecord = { ...record, payload, updated_at };
+
+  return toEntity(newRecord);
+};
+
+export const deleteData: (
+  client: DynamoDB.DocumentClient,
+  params: { userId: string; dataId: string }
+) => Promise<void> = async (client, { userId, dataId }) => {
+  const record = await getDataRecord(client, { userId, dataId });
+
+  if (!record) {
+    throw new NonExistentError();
+  }
+
+  await deleteDataRecord(client, { userId, dataId });
 };

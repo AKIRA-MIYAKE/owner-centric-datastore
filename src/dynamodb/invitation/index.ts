@@ -119,7 +119,7 @@ export const queryInvitationRecordsByUserIdWithStatus: (
     TableName: process.env.DYNAMODB!,  // eslint-disable-line
     IndexName: 'gsi_0',
     KeyConditionExpression:
-      'gsi_hash_key_0 = :gsi_hk_0  begins_with(gsi_range_key_0, :gsi_rk_0)',
+      'gsi_hash_key_0 = :gsi_hk_0 and begins_with(gsi_range_key_0, :gsi_rk_0)',
     ExpressionAttributeValues: {
       ':gsi_hk_0': `user:${userId}/invitation`,
       ':gsi_rk_0': `status:${status}`,
@@ -201,9 +201,9 @@ export const updateInvitationRecordWithAcceptStatusAndCreateMemberRecord: (
     updated_at: now.toISOString(),
     created_at: now.toISOString(),
     hash_key: `group:${groupId}`,
-    range_key: `group:${groupId}/role:${memberRole}/member:${memberId}`,
-    gsi_hash_key_0: `user:${userId}/group`,
-    gsi_range_key_0: `role:${memberRole}/group/${groupId}`,
+    range_key: `group:${groupId}/member:${memberId}`,
+    gsi_hash_key_0: `user:${userId}/member`,
+    gsi_range_key_0: `role:${memberRole}/group:${groupId}/member:${memberId}`,
   };
 
   await client

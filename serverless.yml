@@ -71,11 +71,27 @@ functions:
           method: GET
           cors: true
           authorizer: demoAuthorizer
-  listDataWithDataType:
-    handler: src/handlers/api/user/data/data-type/list.handler
+  patchData:
+    handler: src/handlers/api/user/data/patch.handler
     events:
       - http:
-          path: user/data/{data_type}
+          path: user/data/{data_id}
+          method: PATCH
+          cors: true
+          authorizer: demoAuthorizer
+  deleteData:
+    handler: src/handlers/api/user/data/delete.handler
+    events:
+      - http:
+          path: user/data/{data_id}
+          method: DELETE
+          cors: true
+          authorizer: demoAuthorizer
+  listDataWithDataType:
+    handler: src/handlers/api/user/data/types/list.handler
+    events:
+      - http:
+          path: user/data/types/{data_type}
           method: GET
           cors: true
           authorizer: demoAuthorizer
@@ -120,11 +136,19 @@ functions:
           cors: true
           authorizer: demoAuthorizer
   listGroupDataWithDataType:
-    handler: src/handlers/api/groups/data/data-type/list.handler
+    handler: src/handlers/api/groups/data/types/list.handler
     events:
       - http:
-          path: groups/{group_id}/data/{data_type}
+          path: groups/{group_id}/data/types/{data_type}
           method: GET
+          cors: true
+          authorizer: demoAuthorizer
+  deleteMember:
+    handler: src/handlers/api/groups/members/delete.handler
+    events:
+      - http:
+          path: groups/{group_id}/members/{member_id}
+          method: DELETE
           cors: true
           authorizer: demoAuthorizer
   createInvitation:

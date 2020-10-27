@@ -52,11 +52,24 @@ List data for the authenticated user
 #### [`POST /user/data`](./src/handlers/api/user/data/create.ts)
 Create a data for the authenticated user
 
+#### [`PATCH /user/data/:data_id`](./src/handlers/api/user/data/patch.ts)
+Update the data for the authenticated user
+
+#### [`DELETE /user/data/:data_id`](./src/handlers/api/user/data/delete.ts)
+Delete the data for the authenticated user
+
+#### [`GET /user/data/types/:type`](./src/handlers/api/user/data/types/list.ts)
+List data of specific type for the authenticated user
+
 #### [`GET /groups/:group_id/data`](./src/handlers/api/groups/data/list.ts)
 List group data  
 Authenticated user must be a consumer of the group
 
-### Group
+#### [`GET /groups/:group_id/data/types/:type`](./src/handlers/api/groups/data/types/list.ts)
+List group data of specfic type   
+Authenticated user must be a consumer of the group
+
+### Groups
 #### [`POST /groups`](./src/handlers/api/groups/create.ts)
 Create a group owned by an authenticated user
 
@@ -64,10 +77,15 @@ Create a group owned by an authenticated user
 Get a group  
 Authenticated user must be a member of the group
 
-#### [`GET /user/groups`](./src/handlers/api/user/groups/list.ts)
-List references of group for the authenticated user
+### Members
+#### [`GET /user/members`](./src/handlers/api/user/members/list.ts)
+List group members for the authenticated user
 
-### Invitation
+#### [`DELETE /groups/:group_id/members/:member_id`](./src/handlers/api/groups/members/delete.ts)
+Delete a group member  
+Authenticated user must be a owner of the group
+
+### Invitations
 #### [`GET /groups/:group_id/invitations`](./src/handlers/api/groups/invitations/list.ts)
 List group invitations  
 Authenticated user must be a owner of the group

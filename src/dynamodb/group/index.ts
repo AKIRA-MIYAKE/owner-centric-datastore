@@ -95,9 +95,9 @@ export const putGroupAndOwnerMemberRecord: (
     updated_at: now.toISOString(),
     created_at: now.toISOString(),
     hash_key: `group:${groupId}`,
-    range_key: `group:${groupId}/role:owner/member:${memberId}`,
-    gsi_hash_key_0: `user:${userId}/group`,
-    gsi_range_key_0: `role:owner/group:${groupId}`,
+    range_key: `group:${groupId}/member:${memberId}`,
+    gsi_hash_key_0: `user:${userId}/member`,
+    gsi_range_key_0: `role:owner/group:${groupId}/member:${memberId}`,
   };
 
   await client
